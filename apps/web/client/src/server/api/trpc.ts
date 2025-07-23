@@ -33,7 +33,7 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
     try {
         const {
             data: { user },
-            error,``
+            error,
         } = await supabase.auth.getUser();
 
         // Don't throw error immediately - let procedures handle auth as needed
