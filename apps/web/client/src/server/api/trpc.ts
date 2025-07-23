@@ -29,21 +29,35 @@ import { ZodError } from 'zod';
  */
 export const createTRPCContext = async (opts: { headers: Headers }) => {
     const supabase = await createClient();
-    const {
-        data: { user },
-        error,
-    } = await supabase.auth.getUser();
+    
+    try {
+        const {
+            data: { user },
+            error,``
+        } = await supabase.auth.getUser();
 
-    if (error) {
-        throw new TRPCError({ code: 'UNAUTHORIZED', message: error.message });
+        // Don't throw error immediately - let procedures handle auth as needed
+        if (error) {
+            console.warn('Auth error in tRPC context:', error.message);
+        }
+
+        return {
+            db,
+            supabase,
+            user: user || null, // Explicitly set to null if no user
+            ...opts,
+        };
+    } catch (error: any) {
+        console.warn('Failed to get user in tRPC context:', error.message);
+        
+        // Return context with null user instead of throwing
+        return {
+            db,
+            supabase,
+            user: null,
+            ...opts,
+        };
     }
-
-    return {
-        db,
-        supabase,
-        user,
-        ...opts,
-    };
 };
 
 /**
@@ -129,10 +143,15 @@ export const publicProcedure = t.procedure.use(timingMiddleware);
  */
 export const protectedProcedure = t.procedure.use(timingMiddleware).use(({ ctx, next }) => {
     if (!ctx.user) {
-        throw new TRPCError({ code: 'UNAUTHORIZED' });
+        console.warn('🔒 Protected procedure called without authenticated user');
+        throw new TRPCError({ 
+            code: 'UNAUTHORIZED',
+            message: 'Authentication required. Please sign in to access this resource.'
+        });
     }
 
     if (!ctx.user.email) {
+        console.warn('🔒 User missing email address:', ctx.user.id);
         throw new TRPCError({
             code: 'UNAUTHORIZED',
             message: 'User must have an email address to access this resource',
@@ -144,6 +163,7 @@ export const protectedProcedure = t.procedure.use(timingMiddleware).use(({ ctx, 
             // infers the `session` as non-nullable
             user: ctx.user as SetRequiredDeep<User, 'email'>,
             db: ctx.db,
+            supabase: ctx.supabase,
         },
     });
 });

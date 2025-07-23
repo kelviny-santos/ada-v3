@@ -4,11 +4,17 @@ import { extractNames } from '@onlook/utility';
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { createTRPCRouter, protectedProcedure } from '../../trpc';
+import { createTRPCRouter, protectedProcedure, publicProcedure } from '../../trpc';
 import { userSettingsRouter } from './user-settings';
 
 export const userRouter = createTRPCRouter({
-    get: protectedProcedure.query(async ({ ctx }) => {
+    get: publicProcedure.query(async ({ ctx }) => {
+        // Permite acesso sem autenticação obrigatória
+        if (!ctx.user) {
+            console.log('👤 Usuário não autenticado - retornando null');
+            return null;
+        }
+        
         const authUser = ctx.user;
         const user = await ctx.db.query.users.findFirst({
             where: eq(users.id, authUser.id),
